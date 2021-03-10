@@ -1,21 +1,22 @@
 #include "party.h"
 
+
 // For setting serial numbers
 int Party::runningNum = 0;
 
-Person** Party::getChosenRepsOfParty(District& dist, int numOfReps) {
+DynamicArray<Person*>* Party::getChosenRepsOfParty(AbstractDistrict& dist, int numOfReps) {
 	int i;
 	bool found = false;
-	Person** resRepList; 
+	DynamicArray<Person*>* resRepList; 
 	int curDistNum;
 	int wantedDistNum = dist.getSerialNumber();
-	for (i = 0; i < delLS && !found; i++) { // to find the representatives for dist
+	for (i = 0; i < allReps.size() && !found; i++) { // to find the representatives for dist
 		curDistNum = allReps[i].getDistrict().getSerialNumber();
 		if (curDistNum == wantedDistNum) // search in allReps for the district, to acces the reps array.
 			found = true;	//FOUND!
 	}
 	if (!found) // the party don't have any representative in dist
-		return nullptr;	// NOT ENOUGH REPS IN PARTY FOR ELECTORS IT GOT
+		throw logic_error("the party don't have any representative in the district");	// NOT ENOUGH REPS IN PARTY FOR ELECTORS IT GOT
 		
 	resRepList = allReps[i-1].getChosenRepsOfParty(numOfReps);
 	return resRepList;
@@ -26,83 +27,44 @@ Person** Party::getChosenRepsOfParty(District& dist, int numOfReps) {
 	
 	os << p.name << ", Serial number of party: " << p.partyNumber << ", Head candidate of the party: " << p.headCandidate->getName() <<endl;
 	os << "The representatives of the party:" << endl;
-	for (int i = 0; i < p.delLS; i++)
+	for (int i = 0; i < p.allReps.size(); i++)
 		os << p.allReps[i] <<endl;
 	
 	return os;
 }
 
-Party::Party(char* str, Person& head): headCandidate(&head) 
+Party::Party(const string str, Person& head): headCandidate(&head), name(str), allReps(5)
 {
-	allReps = new repsList [delPS];
 	partyNumber = runningNum;
 	runningNum++;
-	setName(str);
 }
 
-void Party::reallocAllReps()
-{
-	if (delLS >= delPS) {
-		delPS *= 2;
-		repsList* temp = new repsList [delPS];
-		for (int i = 0; i < delLS; i++)
-			temp[i] = allReps[i];
-		delete[]allReps;
-		allReps = temp;
-	}
-}
-
-void Party::addRep(Person *rep, District *dist)
+void Party::addRep(Person *rep, AbstractDistrict *dist)
 {
 	int i;
 	
-	for (i = 0; i < delLS; i++) {
+	for (i = 0; i < allReps.size(); i++) {
 		if (allReps[i].getDistrict().getSerialNumber() == dist->getSerialNumber()) {
 			allReps[i].addRep(rep);
 			return;
 		}
 	}
-	if (i >= delLS) // there wasn't any representative in this district
+	if (i >= allReps.size()) // there wasn't any representative in this district
 	{
-		reallocAllReps();
-		allReps[delLS].setDistrict(dist);
-		allReps[delLS].addRep(rep);
-		delLS++;
+		repsList rl;
+		rl.setDistrict(dist);
+		rl.addRep(rep);
+		allReps.push_back(rl);
 	}
 }
 
-Party::~Party()
-{
-	if(name !=nullptr)
-		delete[] name;
-	if (allReps != nullptr)
-		delete[] allReps;
-}
-
-bool Party::setName(char* str){
+void Party::setName(const string str){
 	
-	if (name != nullptr)
-		delete[] name;
-
-	name = new char[strlen(str)+1];
-	nameLS = strlen(str);
-	namePS = nameLS + 1;
-
-	// copy the string into the name -  can't use strdup or strcpy
-	int read = 0, write = 0;
-
-	while (str[read] != '\0') {
-		name[write] = str[read];
-		write++;
-		read++;
-	}
-	name[write] = '\0'; // sign end of string
-	return true;
+	name = str;
 }
 
-bool Party::setHeadCandidate(Person& p) {
+void Party::setHeadCandidate(Person& p) {
 	headCandidate = &p;
-	return true;
 }
 
 //////////// methods of repsList
@@ -110,44 +72,63 @@ bool Party::setHeadCandidate(Person& p) {
 ostream& operator<<(ostream& os, const repsList& list) {
 	os << "In District " << list.dist->getName() << ":" << endl;
 	int i;
-	for (i = 0; i < list.logSize-1; i++)
-		os << list.reps[i]->getName() << ", ";
-	if (i != 0)
+	for (i = 0; i < list.getLogSize(); i++) {
 		os << list.reps[i]->getName();
+		if ((i + 1) != list.getLogSize()) os<< ", ";
+	}
 	os << endl;
 	return os;
 }
 
-bool repsList::addRep(Person* rep) {
-	reallocReps();
-	reps[logSize] = rep;
-	logSize++;
-	return true;
+void repsList::addRep(Person* rep) {
+	
+	reps.push_back(rep);
 }
 
 
-void repsList::reallocReps() {
-	if (logSize >= phySize) {
-		phySize *= 2;
-		Person** temp = new Person * [phySize];
-		for (int i = 0; i < logSize; i++) 
-			temp[i] = reps[i];
-		delete[] reps;
-		reps = temp;
-	}
-}
 
 // repsList Method:
 
-Person** repsList::getChosenRepsOfParty(int numOfReps) const 
+DynamicArray<Person*>* repsList::getChosenRepsOfParty(int numOfReps)
 {
 	int i;
-	Person** resRepList = new Person * [numOfReps];
-	for (i = 0; i < logSize && i < numOfReps; i++)
-		resRepList[i] = reps[i];
+	DynamicArray<Person*>* resRepList;
+	resRepList = new DynamicArray<Person*>(numOfReps);
+	
+	for (i = 0; i < getLogSize() && i < numOfReps; i++)
+		(*resRepList)[i] = reps[i];
 	if (i < numOfReps) { // there were not enough representatives for the party in the district
-		delete[] resRepList;
-		resRepList = nullptr;
+		throw (logic_error("not enough representatives for the party in the district"));
 	}
 	return resRepList;
+}
+
+// ** methods to work with file ** //
+void Party::save(ofstream& out) const {
+	int headID = headCandidate->getPersonID();
+	out.write(rCastCC(&headID), sizeof(headID)); // save the id of the head candidate
+	out.write(rCastCC(&partyNumber), sizeof(partyNumber)); // save the party serial number
+	int nameSize = name.size();
+	out.write(rCastCC(&nameSize), sizeof(nameSize)); // save the logical size of the name of the party
+	out.write(rCastCC(&name), sizeof(name)); // save the name of the party
+	int repsSize = allReps.size();
+	out.write(rCastCC(&repsSize), sizeof(repsSize)); // save the number of district in which the party have representatives
+	out.write(rCastCC(&countVotes), sizeof(countVotes));
+	if(! out.good())
+		throw ios::failure("Error in writing to file");
+}
+
+Party::Party(ifstream& in, Person& head) :headCandidate(&head),electorsCount(0){
+	in.read(rCastC(&partyNumber), sizeof(partyNumber));
+	if (runningNum <= partyNumber)
+		runningNum = partyNumber + 1;
+	int nameSize;
+	in.read(rCastC(&nameSize), sizeof(nameSize));
+	name.resize(nameSize); 
+	in.read(rCastC(&name), sizeof(name));
+	int delPS;
+	in.read(rCastC(&delPS), sizeof(delPS));
+	allReps.resize(++delPS); //= new repsList[++delPS];
+	in.read(rCastC(&countVotes), sizeof(countVotes));
+	if (!in.good()) throw ios::failure("Error reading from file. ");
 }
