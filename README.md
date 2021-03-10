@@ -7,4 +7,4 @@ The project should keep all the information about the citizens who can vote,
 about all the parties and citizens running in the election
 and about all the legitimate votes received during the election round.
 
-In the project, care must be taken to check the legality of each action in the main menu and to address any errors that may arise.
+In the project, we must check the legality of each action in the main menu and to address any errors that may arise.
